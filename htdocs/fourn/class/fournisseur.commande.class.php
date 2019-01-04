@@ -1159,8 +1159,16 @@ class CommandeFournisseur extends CommonOrder
         {
             $this->db->begin();
 
-            $sql = "UPDATE ".MAIN_DB_PREFIX."commande_fournisseur SET fk_statut = ".self::STATUS_ORDERSENT.", fk_input_method=".$methode.", date_commande='".$this->db->idate($date)."'";
-            $sql .= " WHERE rowid = ".$this->id;
+            $sql = "UPDATE ".MAIN_DB_PREFIX."commande_fournisseur ";
+            $sql.= "SET fk_statut = ".self::STATUS_ORDERSENT;
+            $sql.= ", fk_input_method=".$methode;
+            $sql.= ", date_commande='".$this->db->idate($date)."'";
+            $sql.= ", note_private= CASE";
+            $sql.= " WHEN note_private IS NOT NULL";
+            $sql.= " THEN CONCAT(note_private, '<br/>".$comment."')";
+            $sql.= " ELSE '".$comment."'";
+            $sql.= " END ";
+            $sql.= " WHERE rowid = ".$this->id;
 
             dol_syslog(get_class($this)."::commande", LOG_DEBUG);
             if ($this->db->query($sql))
@@ -1168,7 +1176,8 @@ class CommandeFournisseur extends CommonOrder
                 $this->statut = self::STATUS_ORDERSENT;
                 $this->methode_commande_id = $methode;
                 $this->date_commande = $date;
-
+                $this->note_private = $comment;
+		    
                 // Call trigger
                 $result=$this->call_trigger('ORDER_SUPPLIER_SUBMIT',$user);
                 if ($result < 0) $error++;
@@ -1507,8 +1516,6 @@ class CommandeFournisseur extends CommonOrder
 
 		if ($this->statut == self::STATUS_DRAFT)
 		{
-			include_once DOL_DOCUMENT_ROOT.'/core/lib/price.lib.php';
-
 			// Clean parameters
 			if (! $qty) $qty=1;
 			if (! $info_bits) $info_bits=0;
@@ -2164,6 +2171,11 @@ class CommandeFournisseur extends CommonOrder
 
                 $sql = "UPDATE ".MAIN_DB_PREFIX."commande_fournisseur";
                 $sql.= " SET fk_statut = ".$statut;
+            	$sql.= ", note_private= CASE";
+		$sql.= " WHEN note_private IS NOT NULL";
+		$sql.= " THEN CONCAT(note_private, '<br/>".$comment."')";
+		$sql.= " ELSE '".$comment."'";
+		$sql.= " END ";
                 $sql.= " WHERE rowid = ".$this->id;
                 $sql.= " AND fk_statut IN (".self::STATUS_ORDERSENT.",".self::STATUS_RECEIVED_PARTIALLY.")";	// Process running or Partially received
 
@@ -2174,7 +2186,8 @@ class CommandeFournisseur extends CommonOrder
                     $result = 0;
                     $old_statut = $this->statut;
                     $this->statut = $statut;
-					$this->actionmsg2 = $comment;
+                    $this->note_private = $comment;			    ;
+					// $this->actionmsg2 = $comment;
 
                     // Call trigger
                     $result=$this->call_trigger('ORDER_SUPPLIER_RECEIVE',$user);
